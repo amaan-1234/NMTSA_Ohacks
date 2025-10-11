@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRight, Award, Users } from "lucide-react";
-import heroImage from "@assets/stock_images/healthcare_professio_952f6cf7.jpg";
+import heroImage from "@assets/stock_images/music_notes_instrume_07962769.jpg";
 
 export default function Hero() {
   return (
@@ -9,7 +9,7 @@ export default function Hero() {
       <div className="absolute inset-0">
         <img
           src={heroImage}
-          alt="Healthcare professional in therapy session"
+          alt="Music therapy instruments and notes"
           className="w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/60 to-black/50" />

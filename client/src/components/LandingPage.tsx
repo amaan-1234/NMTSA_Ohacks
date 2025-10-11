@@ -1,11 +1,7 @@
 import Hero from "./Hero";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Award, Smartphone, Users } from "lucide-react";
-import CourseCard from "./CourseCard";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import course1 from "@assets/stock_images/online_learning_educ_c7bf3739.jpg";
-import course2 from "@assets/stock_images/medical_training_pro_24e28be1.jpg";
-import course3 from "@assets/stock_images/online_learning_educ_fb9f3b00.jpg";
 import instructor1 from "@assets/stock_images/professional_instruc_df26bc9c.jpg";
 import instructor2 from "@assets/stock_images/professional_instruc_1e1ae0c4.jpg";
 
@@ -25,39 +21,6 @@ export default function LandingPage() {
       icon: Smartphone,
       title: "Flexible Learning",
       description: "Access courses anytime, anywhere on any device. Perfect for busy healthcare professionals on the go.",
-    },
-  ];
-
-  const featuredCourses = [
-    {
-      id: "1",
-      title: "Fundamentals of Neurologic Music Therapy",
-      instructor: "Dr. Sarah Mitchell",
-      thumbnail: course1,
-      duration: "8 hours",
-      ceCredits: 8,
-      isPremium: true,
-      price: 199,
-      level: "Beginner" as const,
-    },
-    {
-      id: "2",
-      title: "Advanced NMT for Stroke Rehabilitation",
-      instructor: "Dr. James Chen",
-      thumbnail: course2,
-      duration: "12 hours",
-      ceCredits: 12,
-      isPremium: true,
-      price: 299,
-      level: "Advanced" as const,
-    },
-    {
-      id: "3",
-      title: "Family-Centered Music Therapy",
-      instructor: "Lisa Thompson, MT-BC",
-      thumbnail: course3,
-      duration: "4 hours",
-      level: "Beginner" as const,
     },
   ];
 
@@ -113,21 +76,103 @@ export default function LandingPage() {
 
       <section className="py-20 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-end justify-between mb-8">
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold font-[Poppins] mb-2">
-                Featured Courses
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl md:text-4xl font-bold font-[Poppins] mb-4">
+                About NMTSA
               </h2>
-              <p className="text-muted-foreground">
-                Start your learning journey with our most popular courses
-              </p>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {featuredCourses.map((course) => (
-              <CourseCard key={course.id} {...course} />
-            ))}
+            <div className="space-y-12">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-2xl font-[Poppins]">Our Vision</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground leading-relaxed">
+                      Unleashing the unique potential of individuals with disabilities.
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-2xl font-[Poppins]">Our Mission</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground leading-relaxed">
+                      NMTSA partners with those impacted by disability to change lives through using the brain's response to music, and optimizing body and brain connections. NMTSA assumes the competence of all.
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-2xl font-[Poppins]">Our Core Values</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground mb-4">NMTSA believes in...</p>
+                  <ul className="space-y-3 text-muted-foreground">
+                    <li className="flex gap-3">
+                      <span className="text-primary mt-1">•</span>
+                      <span>the capability of all people to reach their goals and attain their full potential.</span>
+                    </li>
+                    <li className="flex gap-3">
+                      <span className="text-primary mt-1">•</span>
+                      <span>the competence of all people.</span>
+                    </li>
+                    <li className="flex gap-3">
+                      <span className="text-primary mt-1">•</span>
+                      <span>the valuable contribution every person has to offer through their unique person and abilities.</span>
+                    </li>
+                    <li className="flex gap-3">
+                      <span className="text-primary mt-1">•</span>
+                      <span>the connection of science and relationship, and the impact both have on every person.</span>
+                    </li>
+                  </ul>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-2xl font-[Poppins]">Our Story</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 text-muted-foreground leading-relaxed">
+                  <p>
+                    Neurologic Music Therapy Services of Arizona's (NMTSA) vision is to unleash the unique potential of individuals with disabilities. NMTSA has provided services to persons with neurologic impairments (ages 18 months to 75+ years of age) and their families in the greater Phoenix area since 1982.
+                  </p>
+                  <p>
+                    NMTSA is nationally recognized for its evidence-based approach to treatment with persons with neurological impairments, and children with autism specifically. The company and its staff maintain a close relationship with research staff from universities across the country (with emphasis in NMT®, competency-based communication, inclusion, and psychomotor regulation/movement disorders) in order to remain current with best practice approaches for the individuals served.
+                  </p>
+                </CardContent>
+              </Card>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-2xl font-[Poppins]">Our Clinic</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-muted-foreground leading-relaxed">
+                    <p>
+                      NMTSA's clinic space was designed and built to be optimized for NMT activities. It contains eight individual therapy rooms, a large group room for group NMT sessions, administrative offices, a recording studio in which clients can make and produce their own music, and a waiting room. We are committed to providing a safe, fragrance-free environment for all our clients, and are sensitive to other client allergies and needs.
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-2xl font-[Poppins]">Our Therapists</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-muted-foreground leading-relaxed">
+                    <p>
+                      All of the therapists at NMTSA hold the national certification credential MT-BC issued by the Certification Board for Music Therapists. Additionally, all NMTSA therapists are required to obtain additional advanced clinical training in Neurologic Music Therapy (NMT)® through the Academy of Neurologic Music Therapy® and to maintain Fellowship status with the Academy of Neurologic Music Therapy.
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           </div>
         </div>
       </section>

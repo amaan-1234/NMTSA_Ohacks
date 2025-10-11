@@ -1,5 +1,10 @@
 import Hero from '../Hero';
+import { ThemeProvider } from '../ThemeProvider';
 
 export default function HeroExample() {
-  return <Hero />;
+  return (
+    <ThemeProvider>
+      <Hero />
+    </ThemeProvider>
+  );
 }
