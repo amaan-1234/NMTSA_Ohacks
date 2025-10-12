@@ -1,11 +1,17 @@
+import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Award, BookOpen, Clock, TrendingUp } from "lucide-react";
 import CourseCard from "./CourseCard";
+import { useAuth } from "@/state/auth";
 import course1 from "@assets/stock_images/online_learning_educ_c7bf3739.jpg";
 import course2 from "@assets/stock_images/medical_training_pro_24e28be1.jpg";
 
 export default function Dashboard() {
+  const { isAuthenticated, getDisplayName } = useAuth();
+
+  const displayName = getDisplayName();
+
   const stats = [
     { label: "Courses Enrolled", value: "4", icon: BookOpen, color: "text-primary" },
     { label: "Hours Learned", value: "32.5", icon: Clock, color: "text-chart-2" },
@@ -43,14 +49,16 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold font-[Poppins] mb-2">
-            Welcome back, Alex!
-          </h1>
-          <p className="text-muted-foreground">
-            Continue your learning journey and track your progress
-          </p>
-        </div>
+        {isAuthenticated && (
+          <div className="mb-8">
+            <h1 className="text-2xl md:text-3xl font-semibold">
+              Welcome back, {displayName}
+            </h1>
+            <p className="text-muted-foreground">
+              Continue your learning journey and track your progress
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {stats.map((stat) => (

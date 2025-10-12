@@ -4,11 +4,74 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Clock, Award, BookOpen, Download, CheckCircle, Circle, Play } from "lucide-react";
+import { Clock, Award, BookOpen, Download, CheckCircle, Circle, Play, Loader2, FileVideo, FileText } from "lucide-react";
 import instructorImg from "@assets/stock_images/professional_instruc_df26bc9c.jpg";
 import courseImg from "@assets/stock_images/medical_training_pro_24e28be1.jpg";
+import { useAuth } from "@/state/auth";
+import { useCart } from "@/state/cart";
+import { useRoute, useLocation } from "wouter";
+import { useEffect, useState } from "react";
+import { db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+
+type CourseMaterial = {
+  name: string;
+  url: string;
+  type: string;
+};
+
+type CourseData = {
+  id: string;
+  title: string;
+  instructor: string;
+  description?: string;
+  thumbnail: string;
+  duration: string;
+  ceCredits?: number;
+  price?: number;
+  isPremium?: boolean;
+  level?: string;
+  category?: string;
+  materials?: CourseMaterial[];
+};
 
 export default function CourseDetail() {
+  const [match, params] = useRoute("/course/:id");
+  const courseId = params?.id!;
+  const { isAuthenticated } = useAuth();
+  const { add, showToast } = useCart();
+  const [, setLocation] = useLocation();
+  const [course, setCourse] = useState<CourseData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch course data from Firestore
+  useEffect(() => {
+    const fetchCourse = async () => {
+      try {
+        const courseDoc = await getDoc(doc(db, "courses", courseId));
+        if (courseDoc.exists()) {
+          setCourse({ id: courseDoc.id, ...courseDoc.data() } as CourseData);
+        }
+      } catch (error) {
+        console.error("Error fetching course:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    if (courseId) {
+      fetchCourse();
+    }
+  }, [courseId]);
+
+  const enrollOrAdd = () => {
+    if (!isAuthenticated) return setLocation(`/auth/login?redirect=${encodeURIComponent("/courses?greet=1")}`);
+    if (!course) return;
+    // Add to cart for logged-in users
+    add({ id: String(courseId), title: course.title, price: course.price || 0 }, 1);
+    showToast("Item Added to Cart Successfully");
+  };
+
   const lessons = [
     { id: 1, title: "Introduction to NMT Principles", duration: "45 min", completed: true },
     { id: 2, title: "Neurological Foundations", duration: "60 min", completed: true },
@@ -17,12 +80,25 @@ export default function CourseDetail() {
     { id: 5, title: "Case Studies", duration: "70 min", completed: false },
   ];
 
-  const resources = [
-    { name: "Course Handbook.pdf", size: "2.4 MB" },
-    { name: "Assessment Templates.pdf", size: "1.1 MB" },
-    { name: "Reference Materials.pdf", size: "3.8 MB" },
-    { name: "Music Samples.zip", size: "15.2 MB" },
-  ];
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-3 text-muted-foreground">Loading course...</span>
+      </div>
+    );
+  }
+
+  if (!course) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-semibold mb-2">Course Not Found</h2>
+          <Button onClick={() => setLocation("/courses")}>Back to Courses</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -87,9 +163,9 @@ export default function CourseDetail() {
                     Board-certified music therapist with 15+ years of experience 
                     in neurologic rehabilitation.
                   </p>
-                  <Button className="w-full" data-testid="button-continue-course">
+                  <Button className="w-full" onClick={enrollOrAdd} data-testid="button-continue-course">
                     <Play className="w-4 h-4 mr-2" />
-                    Continue Course
+                    {isAuthenticated ? "Add to Cart" : "Enroll Now"}
                   </Button>
                 </CardContent>
               </Card>
@@ -163,26 +239,66 @@ export default function CourseDetail() {
           <TabsContent value="resources">
             <Card>
               <CardContent className="p-6">
-                <div className="space-y-3">
-                  {resources.map((resource, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-4 rounded-md border border-border hover-elevate transition-all"
-                      data-testid={`resource-${index}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <Download className="w-5 h-5 text-muted-foreground" />
-                        <div>
-                          <p className="font-medium">{resource.name}</p>
-                          <p className="text-sm text-muted-foreground">{resource.size}</p>
+                {course.materials && course.materials.length > 0 ? (
+                  <div className="space-y-3">
+                    {course.materials.map((material, index) => {
+                      const isVideo = material.type.includes('video');
+                      const isPDF = material.type.includes('pdf');
+                      
+                      return (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-4 rounded-md border border-border hover-elevate transition-all"
+                          data-testid={`resource-${index}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            {isVideo ? (
+                              <FileVideo className="w-5 h-5 text-blue-500" />
+                            ) : isPDF ? (
+                              <FileText className="w-5 h-5 text-red-500" />
+                            ) : (
+                              <Download className="w-5 h-5 text-muted-foreground" />
+                            )}
+                            <div>
+                              <p className="font-medium">{material.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {isVideo ? 'Video' : isPDF ? 'PDF Document' : 'File'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            {isVideo && (
+                              <Button 
+                                size="sm" 
+                                variant="default"
+                                onClick={() => window.open(material.url, '_blank')}
+                                data-testid={`button-watch-${index}`}
+                              >
+                                <Play className="w-4 h-4 mr-1" />
+                                Watch
+                              </Button>
+                            )}
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => window.open(material.url, '_blank')}
+                              data-testid={`button-download-${index}`}
+                            >
+                              <Download className="w-4 h-4 mr-1" />
+                              Download
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                      <Button variant="outline" size="sm" data-testid={`button-download-${index}`}>
-                        Download
-                      </Button>
-                    </div>
-                  ))}
-                </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>No course materials available yet.</p>
+                    <p className="text-sm mt-1">Check back later for videos and resources.</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

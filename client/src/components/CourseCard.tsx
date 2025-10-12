@@ -3,6 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Clock, Award, BookOpen } from "lucide-react";
+import { useAuth } from "@/state/auth";
+import { useCart } from "@/state/cart";
+import { useLocation } from "wouter";
 
 interface CourseCardProps {
   id: string;
@@ -19,6 +22,7 @@ interface CourseCardProps {
 }
 
 export default function CourseCard({
+  id,
   title,
   instructor,
   thumbnail,
@@ -30,6 +34,25 @@ export default function CourseCard({
   isEnrolled = false,
   level = "Beginner",
 }: CourseCardProps) {
+  const { isAuthenticated } = useAuth();
+  const { add, showToast } = useCart();
+  const [, setLocation] = useLocation();
+
+  const enrollOrAdd = () => {
+    if (!isAuthenticated) {
+      setLocation(`/auth/login?redirect=${encodeURIComponent("/courses?greet=1")}`);
+      return;
+    }
+    // Add to cart for logged-in users
+    const courseTitle = title || "Course";
+    const coursePrice = price ?? null;
+    add({ id: String(id), title: courseTitle, price: coursePrice }, 1);
+    showToast("Item Added to Cart Successfully");
+  };
+
+  const onContinue = () => {
+    setLocation(`/courses/${id}`);
+  };
   return (
     <Card className="overflow-hidden hover-elevate transition-all duration-200 group" data-testid={`card-course-${title.toLowerCase().replace(/\s+/g, '-')}`}>
       <div className="relative aspect-video overflow-hidden">
@@ -88,7 +111,7 @@ export default function CourseCard({
 
       <CardFooter className="pt-0">
         {isEnrolled ? (
-          <Button className="w-full" data-testid="button-continue-learning">
+          <Button className="w-full" onClick={onContinue} data-testid="button-continue-learning">
             Continue Learning
           </Button>
         ) : (
@@ -101,9 +124,10 @@ export default function CourseCard({
             <Button
               className={price !== undefined ? "flex-1" : "w-full"}
               variant={price === undefined ? "default" : "default"}
+              onClick={enrollOrAdd}
               data-testid="button-enroll"
             >
-              {price === undefined ? "Enroll Free" : "Enroll Now"}
+              {isAuthenticated ? "Add to Cart" : "Enroll Now"}
             </Button>
           </div>
         )}

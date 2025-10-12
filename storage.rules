@@ -1,0 +1,32 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Course images - authenticated users can upload, anyone can read
+    match /courses/{filename} {
+      allow read: if true; // Public read for course thumbnails
+      allow write: if isAuthenticated(); // Any authenticated user can upload
+      allow delete: if isAuthenticated(); // Any authenticated user can delete
+    }
+    
+    // Course materials (videos/PDFs) - authenticated users can upload, anyone can read
+    match /course-materials/{filename} {
+      allow read: if true; // Public read for course materials
+      allow write: if isAuthenticated(); // Any authenticated user can upload
+      allow delete: if isAuthenticated(); // Any authenticated user can delete
+    }
+    
+    // User uploads - users can only access their own files
+    match /users/{userId}/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+      allow delete: if isAuthenticated() && request.auth.uid == userId;
+    }
+  }
+}
+

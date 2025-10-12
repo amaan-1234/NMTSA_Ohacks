@@ -1,110 +1,93 @@
-import { Link } from "wouter";
+import React from "react";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Moon, Sun, Menu, BookOpen, GraduationCap, MessageSquare, User } from "lucide-react";
-import { useTheme } from "./ThemeProvider";
-import { useState } from "react";
+import { ShoppingCart } from "lucide-react";
+import { useAuth } from "@/state/auth";
+import { useCart } from "@/state/cart";
+import { AccessibilitySettings } from "@/components/AccessibilitySettings";
 
-export default function Navbar() {
-  const { theme, toggleTheme } = useTheme();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+const Navbar: React.FC = () => {
+  const { authReady, isAuthenticated, getDisplayName, user, logout } = useAuth();
+  const { count } = useCart();
+  const [location, setLocation] = useLocation();
+
+  const name = getDisplayName();
+  const isAdmin = user?.role === "admin";
 
   return (
-    <nav className="sticky top-0 z-50 bg-card border-b border-card-border">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-4">
-          <Link href="/">
-            <a className="flex items-center gap-2 hover-elevate active-elevate-2 px-3 py-2 rounded-md transition-colors" data-testid="link-home">
-              <GraduationCap className="w-6 h-6 text-primary" />
-              <span className="text-xl font-semibold font-[Poppins]">NMTSA</span>
-            </a>
-          </Link>
-
-          <div className="hidden md:flex items-center gap-1">
-            <Link href="/courses">
-              <a data-testid="link-courses">
-                <Button variant="ghost" className="gap-2">
-                  <BookOpen className="w-4 h-4" />
-                  Courses
-                </Button>
-              </a>
-            </Link>
-            <Link href="/dashboard">
-              <a data-testid="link-dashboard">
-                <Button variant="ghost">Dashboard</Button>
-              </a>
-            </Link>
-            <Link href="/forums">
-              <a data-testid="link-forums">
-                <Button variant="ghost" className="gap-2">
-                  <MessageSquare className="w-4 h-4" />
-                  Forums
-                </Button>
-              </a>
-            </Link>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleTheme}
-              data-testid="button-theme-toggle"
-            >
-              {theme === "light" ? (
-                <Moon className="w-5 h-5" />
-              ) : (
-                <Sun className="w-5 h-5" />
-              )}
-            </Button>
-
-            <Link href="/profile">
-              <a data-testid="link-profile">
-                <Button variant="ghost" size="icon">
-                  <User className="w-5 h-5" />
-                </Button>
-              </a>
-            </Link>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              data-testid="button-mobile-menu"
-            >
-              <Menu className="w-5 h-5" />
-            </Button>
-          </div>
+    <header className="sticky top-0 z-50 bg-background/80 backdrop-blur border-b">
+      <div className="mx-auto max-w-6xl px-4 h-14 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Link href="/"><a className="font-semibold">NMTSA</a></Link>
+          
+          {/* Show different navigation based on role */}
+          {!isAdmin ? (
+            <nav className="hidden md:flex items-center gap-4 text-sm">
+              <Link href="/courses">
+                <a className={location === "/courses" ? "font-medium" : ""}>Courses</a>
+              </Link>
+              <Link href="/dashboard">
+                <a className={location === "/dashboard" ? "font-medium" : ""}>Dashboard</a>
+              </Link>
+            </nav>
+          ) : (
+            <nav className="hidden md:flex items-center gap-4 text-sm">
+              <Link href="/admin">
+                <a className={location === "/admin" ? "font-medium" : ""}>Admin</a>
+              </Link>
+              <Link href="/admin/add-course">
+                <a className={location === "/admin/add-course" ? "font-medium" : ""}>Add Course</a>
+              </Link>
+              <Link href="/admin/content-category">
+                <a className={location === "/admin/content-category" ? "font-medium" : ""}>Content Category</a>
+              </Link>
+            </nav>
+          )}
         </div>
 
-        {mobileMenuOpen && (
-          <div className="md:hidden py-4 space-y-2">
-            <Link href="/courses">
-              <a className="block" data-testid="link-courses-mobile">
-                <Button variant="ghost" className="w-full justify-start gap-2">
-                  <BookOpen className="w-4 h-4" />
-                  Courses
-                </Button>
-              </a>
-            </Link>
-            <Link href="/dashboard">
-              <a className="block" data-testid="link-dashboard-mobile">
-                <Button variant="ghost" className="w-full justify-start">
-                  Dashboard
-                </Button>
-              </a>
-            </Link>
-            <Link href="/forums">
-              <a className="block" data-testid="link-forums-mobile">
-                <Button variant="ghost" className="w-full justify-start gap-2">
-                  <MessageSquare className="w-4 h-4" />
-                  Forums
-                </Button>
-              </a>
-            </Link>
+        {/* Right side */}
+        {!authReady ? (
+          <div className="w-[180px] h-8 bg-muted rounded animate-pulse" />
+        ) : isAuthenticated ? (
+          <div className="flex items-center gap-3">
+            {/* Only show cart for non-admin users */}
+            {!isAdmin && (
+              <button
+                className="relative inline-flex items-center justify-center h-9 w-9 rounded-md border hover:bg-muted"
+                onClick={() => setLocation("/payments")}
+                aria-label="Cart"
+                title="Cart"
+              >
+                <ShoppingCart className="h-5 w-5" />
+                {count > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[11px] leading-[18px] text-center">
+                    {count}
+                  </span>
+                )}
+              </button>
+            )}
+
+            {/* Accessibility Settings */}
+            <AccessibilitySettings />
+            
+            <span className="text-sm text-muted-foreground">
+              Welcome, <span className="font-medium">{name}</span>
+            </span>
+
+            <Button variant="outline" size="sm" onClick={() => logout()}>Logout</Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            {/* Accessibility Settings - always visible */}
+            <AccessibilitySettings />
+            
+            <Button variant="ghost" size="sm" onClick={() => setLocation("/auth/login")}>Log in</Button>
+            <Button size="sm" onClick={() => setLocation("/auth/signup")}>Sign up</Button>
           </div>
         )}
       </div>
-    </nav>
+    </header>
   );
-}
+};
+
+export default Navbar;

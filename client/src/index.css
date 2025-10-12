@@ -352,3 +352,49 @@
     inset: -1px;
   }
 }
+
+/* ===========================
+ * ACCESSIBILITY FEATURES
+ * =========================== */
+
+/* Brightness control */
+:root {
+  --brightness: 100%;
+  --base-text-size: 1rem;
+}
+
+html {
+  filter: brightness(var(--brightness));
+  font-size: var(--base-text-size);
+  transition: filter 0.2s ease, font-size 0.2s ease;
+}
+
+/* Color invert mode */
+.invert-colors {
+  filter: invert(1) hue-rotate(180deg) brightness(var(--brightness));
+}
+
+/* Prevent images from being inverted when invert mode is on */
+.invert-colors img,
+.invert-colors video,
+.invert-colors [style*="background-image"] {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* Smooth transitions for accessibility changes */
+* {
+  transition-property: filter, font-size;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
+}
+
+/* Ensure text remains readable at different sizes */
+body {
+  line-height: 1.6;
+}
+
+/* Improve focus indicators for keyboard navigation */
+:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+}

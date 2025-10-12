@@ -1,0 +1,41 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Courses - Anyone can read, authenticated users can write
+    match /courses/{courseId} {
+      allow read: if true; // Public read for course catalog
+      allow write: if isAuthenticated(); // Any authenticated user can manage courses
+    }
+    
+    // Categories - Anyone can read, authenticated users can write
+    match /categories/{categoryId} {
+      allow read: if true; // Public read
+      allow write: if isAuthenticated(); // Any authenticated user can manage categories
+    }
+    
+    // User Profiles - Authenticated users can read, write own profile
+    match /profiles/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Approved emails - Authenticated users can read
+    match /approved_emails/{email} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Manage these through Firebase Console only
+    }
+    
+    // Login credentials - Users can only access their own credentials
+    match /login_credentials/{userId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+  }
+}
+

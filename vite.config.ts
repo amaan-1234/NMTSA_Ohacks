@@ -1,7 +1,9 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import path from "path";
+import path from "node:path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+
+const r = (p: string) => path.resolve(import.meta.dirname, p);
 
 export default defineConfig({
   plugins: [
@@ -21,9 +23,9 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@": path.resolve(import.meta.dirname, "client", "src"),
-      "@shared": path.resolve(import.meta.dirname, "shared"),
-      "@assets": path.resolve(import.meta.dirname, "attached_assets"),
+      "@": r("client/src"),
+      "@shared": r("shared"),
+      "@assets": r("attached_assets"),
     },
   },
   root: path.resolve(import.meta.dirname, "client"),
@@ -32,6 +34,9 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
+    port: 5173,
+    strictPort: true,
+    proxy: { "/api": "http://localhost:8787" },
     fs: {
       strict: true,
       deny: ["**/.*"],
