@@ -13,3 +13,6 @@ export function getDb() {
   const client = new Pool({ connectionString: url });
   return drizzle({ client, schema });
 }
+
+// Export a db instance for direct use
+export const db = getDb();
