@@ -7,6 +7,8 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   updateProfile,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import bcrypt from "bcryptjs";
@@ -24,6 +26,7 @@ type AuthContextType = {
   getDisplayName: () => string;
   login: (c: Credentials) => Promise<Result>;
   signup: (c: Credentials) => Promise<Result>;
+  loginWithGoogle: () => Promise<Result>;
   logout: () => Promise<void>;
 };
 
@@ -183,6 +186,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginWithGoogle = async (): Promise<Result> => {
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      
+      // Check role from approvals
+      let dest = "/courses?greet=1";
+      const role = await fetchRoleFromApprovals(user.email);
+      if (role === "admin") dest = "/admin";
+      
+      // Create/update profile in Firestore
+      await setDoc(
+        doc(db, PROFILES, user.uid),
+        {
+          email: user.email,
+          username: user.email ? user.email.split("@")[0] : null,
+          full_name: user.displayName ?? null,
+          role: role ?? "pending",
+          created_at: serverTimestamp(),
+          updated_at: serverTimestamp(),
+        },
+        { merge: true }
+      );
+      
+      setLocation(dest);
+      return { ok: true, message: "Login successful" };
+    } catch (e: any) {
+      // Handle specific error cases
+      if (e.code === "auth/popup-closed-by-user") {
+        return { ok: false, message: "Sign-in popup was closed. Please try again." };
+      }
+      if (e.code === "auth/popup-blocked") {
+        return { ok: false, message: "Popup was blocked by browser. Please allow popups and try again." };
+      }
+      return { ok: false, message: e?.message ?? "Google sign-in failed" };
+    }
+  };
+
   const logout = async () => {
     await signOut(auth);
     setUser(null);
@@ -198,6 +240,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       getDisplayName,
       login,
       signup,
+      loginWithGoogle,
       logout,
     }),
     [user, authReady]

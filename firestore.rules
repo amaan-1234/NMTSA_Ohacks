@@ -36,6 +36,18 @@ service cloud.firestore {
       allow read: if isAuthenticated() && request.auth.uid == userId;
       allow write: if isAuthenticated() && request.auth.uid == userId;
     }
+    
+    // User Courses - Track purchased courses and progress
+    match /user_courses/{userId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Course Progress - Track individual lesson completion
+    match /user_courses/{userId}/courses/{courseId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
   }
 }
 

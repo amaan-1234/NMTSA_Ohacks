@@ -21,3 +21,21 @@ nmtsa-lms final.zip
 
 # Local state
 .local/
+
+# IDE and editor files
+.cursor/
+.vscode/
+.eclipse/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.log

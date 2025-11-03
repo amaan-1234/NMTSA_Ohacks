@@ -11,6 +11,12 @@ const PaymentsCartPage: React.FC = () => {
   const onPayNow = async () => {
     if (items.length === 0) return;
 
+    // Store cart items for post-payment enrollment
+    if (user?.uid) {
+      localStorage.setItem(`pending_purchase_${user.uid}`, JSON.stringify(items));
+      console.log("💾 Saved pending purchase for post-payment enrollment");
+    }
+
     const payload = {
       items: items.map((i) => ({ id: i.id, title: i.title, price: i.price, qty: i.qty })),
       customerEmail: user?.email ?? null,

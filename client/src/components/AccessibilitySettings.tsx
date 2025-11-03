@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings, Sun, Moon, Palette, Type, RotateCcw } from "lucide-react";
+import { Settings, Sun, Moon, Palette, Type, RotateCcw, Accessibility } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -100,14 +100,14 @@ export function AccessibilitySettings() {
           className="relative"
           title="Accessibility Settings"
         >
-          <Settings className="h-5 w-5" />
+          <Accessibility className="h-5 w-5" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80" align="end">
         <Card className="border-0 shadow-none">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
-              <Settings className="h-5 w-5" />
+              <Accessibility className="h-5 w-5" />
               Accessibility Settings
             </CardTitle>
             <CardDescription>

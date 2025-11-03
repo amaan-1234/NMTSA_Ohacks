@@ -1,17 +1,14 @@
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Loader2 } from "lucide-react";
 import CourseCard from "./CourseCard";
 import WelcomeBar from "./WelcomeBar";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
-import course1 from "@assets/stock_images/online_learning_educ_c7bf3739.jpg";
-import course2 from "@assets/stock_images/online_learning_educ_fb9f3b00.jpg";
-import course3 from "@assets/stock_images/online_learning_educ_58ee1c85.jpg";
-import course4 from "@assets/stock_images/medical_training_pro_24e28be1.jpg";
-import course5 from "@assets/stock_images/medical_training_pro_2fca4782.jpg";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { useAuth } from "@/state/auth";
+import { hasAccessToCourse } from "@/lib/courseProgress";
+import { useSearch } from "wouter";
 
 type Course = {
   id: string;
@@ -25,106 +22,82 @@ type Course = {
   level?: "Beginner" | "Intermediate" | "Advanced";
   description?: string;
   category?: string;
+  isEnrolled?: boolean; // Added for enrollment status
+  progress?: number; // Added for progress tracking
 };
 
 export default function CourseCatalog() {
+  const { user, authReady } = useAuth();
+  const search = useSearch();
   const [searchQuery, setSearchQuery] = useState("");
-  const [firestoreCourses, setFirestoreCourses] = useState<Course[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Default courses (fallback/example courses)
-  const defaultCourses: Course[] = [
-    {
-      id: "default-1",
-      title: "Fundamentals of Neurologic Music Therapy",
-      instructor: "Dr. Sarah Mitchell",
-      thumbnail: course1,
-      duration: "8 hours",
-      ceCredits: 8,
-      isPremium: true,
-      price: 199,
-      level: "Beginner" as const,
-    },
-    {
-      id: "default-2",
-      title: "Music Therapy for Stroke Rehabilitation",
-      instructor: "Dr. James Chen",
-      thumbnail: course2,
-      duration: "12 hours",
-      ceCredits: 12,
-      isPremium: true,
-      price: 299,
-      level: "Advanced" as const,
-    },
-    {
-      id: "default-3",
-      title: "Introduction to Rhythmic Auditory Stimulation",
-      instructor: "Dr. Maria Rodriguez",
-      thumbnail: course3,
-      duration: "6 hours",
-      ceCredits: 6,
-      level: "Beginner" as const,
-    },
-    {
-      id: "default-4",
-      title: "Pediatric NMT Approaches",
-      instructor: "Dr. Emily Parker",
-      thumbnail: course4,
-      duration: "10 hours",
-      ceCredits: 10,
-      isPremium: true,
-      price: 249,
-      level: "Intermediate" as const,
-    },
-    {
-      id: "default-5",
-      title: "Assessment Techniques in NMT",
-      instructor: "Dr. David Kim",
-      thumbnail: course5,
-      duration: "6 hours",
-      ceCredits: 6,
-      level: "Intermediate" as const,
-    },
-    {
-      id: "default-6",
-      title: "Family-Centered Music Therapy Resources",
-      instructor: "Lisa Thompson, MT-BC",
-      thumbnail: course1,
-      duration: "4 hours",
-      level: "Beginner" as const,
-    },
-  ];
+  // Get tab from URL query parameter
+  const urlParams = new URLSearchParams(search);
+  const defaultTab = urlParams.get('tab') || 'all';
 
-  // Fetch courses from Firestore
+  // Fetch courses from Firestore (only admin-added courses)
   useEffect(() => {
     const fetchCourses = async () => {
+      // Wait for auth to be ready
+      if (!authReady) return;
+      
       try {
+        // Simplified query - removed orderBy to avoid composite index requirement
         const q = query(
           collection(db, "courses"),
-          where("status", "==", "published"),
-          orderBy("createdAt", "desc")
+          where("status", "==", "published")
         );
         const snapshot = await getDocs(q);
         
-        const courses: Course[] = snapshot.docs.map(doc => ({
+        const fetchedCourses: Course[] = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
         })) as Course[];
 
-        setFirestoreCourses(courses);
-      } catch (error) {
-        console.error("Error fetching courses:", error);
-        // If there's an error or no courses, we'll still have the default courses
+        // Sort by createdAt in JavaScript instead of Firestore
+        const sortedCourses = fetchedCourses.sort((a: any, b: any) => {
+          const aTime = a.createdAt?.toMillis?.() || 0;
+          const bTime = b.createdAt?.toMillis?.() || 0;
+          return bTime - aTime; // newest first
+        });
+
+        // Check enrollment status for each course if user is authenticated
+        const coursesWithEnrollment = await Promise.all(
+          sortedCourses.map(async (course) => {
+            if (user?.id) {
+              const enrolled = await hasAccessToCourse(user.id, course.id);
+              return {
+                ...course,
+                isEnrolled: enrolled,
+                progress: enrolled ? 100 : 0, // For now, assume completed if enrolled
+              };
+            }
+            return {
+              ...course,
+              isEnrolled: false,
+              progress: 0,
+            };
+          })
+        );
+
+        setCourses(coursesWithEnrollment);
+        console.log(`✅ Loaded ${coursesWithEnrollment.length} published courses with enrollment status`);
+      } catch (error: any) {
+        console.error("❌ Error fetching courses:", error);
+        console.error("Error code:", error.code);
+        console.error("Error message:", error.message);
       } finally {
         setLoading(false);
       }
     };
 
     fetchCourses();
-  }, []);
+  }, [authReady, user?.id]);
 
-  // Combine Firestore courses with default courses
-  const allCourses = [...firestoreCourses, ...defaultCourses];
+  // Use only Firestore courses (admin-added)
+  const allCourses = courses;
 
   // Filter courses based on search query
   const filteredCourses = allCourses.filter(course =>
@@ -169,8 +142,8 @@ export default function CourseCatalog() {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             <span className="ml-3 text-muted-foreground">Loading courses...</span>
           </div>
-        ) : (
-          <Tabs defaultValue="all" className="w-full">
+            ) : (
+              <Tabs defaultValue={defaultTab} className="w-full">
             <TabsList className="mb-8">
               <TabsTrigger value="all" data-testid="tab-all-courses">
                 All Courses ({filteredCourses.length})

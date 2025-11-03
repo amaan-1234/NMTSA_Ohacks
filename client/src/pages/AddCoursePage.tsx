@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { db, storage } from "@/lib/firebase";
+import { db, storage, auth } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp, getDocs, query, orderBy } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Button } from "@/components/ui/button";
@@ -148,6 +148,18 @@ export default function AddCoursePage() {
     setLoading(true);
 
     try {
+      // Check authentication
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        toast({
+          title: "Authentication Required",
+          description: "You must be logged in to add courses",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
       // Validation
       if (!formData.title || !formData.instructor || !formData.duration) {
         toast({
@@ -180,17 +192,21 @@ export default function AddCoursePage() {
       let materialUrls: { name: string; url: string; type: string }[] = [];
       if (courseMaterials.length > 0) {
         toast({
-          title: "Uploading",
+          title: "Uploading Materials",
           description: `Uploading ${courseMaterials.length} course material(s)...`,
         });
         
         for (let i = 0; i < courseMaterials.length; i++) {
+          toast({
+            title: "Uploading Materials",
+            description: `Uploading file ${i + 1} of ${courseMaterials.length}: ${courseMaterials[i].name}`,
+          });
           const material = await uploadCourseMaterial(courseMaterials[i]);
           materialUrls.push(material);
         }
       }
 
-      // Create course object
+      // Create course object with createdBy field
       const courseData = {
         title: formData.title,
         instructor: formData.instructor,
@@ -203,9 +219,13 @@ export default function AddCoursePage() {
         level: formData.level,
         category: formData.category || "Uncategorized",
         materials: materialUrls,
+        createdBy: currentUser.uid,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         status: "published",
+        active: true,
+        accessLevel: "client",
+        contentType: "pdf",
       };
 
       // Add to Firestore
@@ -245,9 +265,23 @@ export default function AddCoursePage() {
 
     } catch (error: any) {
       console.error("Error adding course:", error);
+      
+      let errorMessage = "Failed to add course";
+      
+      // Provide more specific error messages
+      if (error.code === "storage/unauthorized") {
+        errorMessage = "Permission denied. Please ensure you're logged in and Firebase Storage rules are deployed.";
+      } else if (error.code === "permission-denied") {
+        errorMessage = "Permission denied. Please ensure Firestore rules are deployed.";
+      } else if (error.code === "storage/quota-exceeded") {
+        errorMessage = "Storage quota exceeded. Please check your Firebase Storage limits.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
-        title: "Error",
-        description: error.message || "Failed to add course",
+        title: "Error Adding Course",
+        description: errorMessage,
         variant: "destructive",
       });
       setLoading(false);
@@ -255,19 +289,35 @@ export default function AddCoursePage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <Card>
-        <CardHeader>
-          <CardTitle>Add New Course</CardTitle>
-          <CardDescription>
-            Create a new course for the learning management system
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Thumbnail Upload */}
-            <div className="space-y-2">
-              <Label htmlFor="thumbnail">Course Thumbnail *</Label>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      <div className="max-w-5xl mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="mb-8 space-y-2">
+          <h1 className="text-3xl font-bold tracking-tight">Add New Course</h1>
+          <p className="text-muted-foreground">
+            Create a new course with materials and organize by category
+          </p>
+        </div>
+
+        <Card className="shadow-md">
+          <CardHeader className="bg-muted/30">
+            <CardTitle>Course Details</CardTitle>
+            <CardDescription>
+              Fill in the information below to add a new course to the system
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <form onSubmit={handleSubmit} className="space-y-8">
+            {/* Basic Information Section */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <ImageIcon className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-semibold">Basic Information</h3>
+              </div>
+
+              {/* Thumbnail Upload */}
+              <div className="space-y-2">
+                <Label htmlFor="thumbnail">Course Thumbnail *</Label>
               <div className="flex items-center gap-4">
                 <div className="flex-1">
                   <div className="relative">
@@ -326,18 +376,27 @@ export default function AddCoursePage() {
               />
             </div>
 
-            {/* Description */}
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleInputChange}
-                placeholder="Brief description of the course..."
-                rows={4}
-              />
+              {/* Description */}
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  placeholder="Brief description of the course..."
+                  rows={4}
+                  className="resize-none"
+                />
+              </div>
             </div>
+
+            {/* Course Materials Section */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <Upload className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-semibold">Course Materials</h3>
+              </div>
 
             {/* Course Materials (Videos/PDFs) */}
             <div className="space-y-2">
@@ -381,6 +440,14 @@ export default function AddCoursePage() {
                 </div>
               )}
             </div>
+            </div>
+
+            {/* Course Details Section */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <Loader2 className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-semibold">Course Details</h3>
+              </div>
 
             {/* Duration and CE Credits */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -483,9 +550,10 @@ export default function AddCoursePage() {
                 </p>
               </div>
             </div>
+            </div>
 
             {/* Submit Button */}
-            <div className="flex justify-end gap-3 pt-4">
+            <div className="flex justify-end gap-3 pt-6 border-t">
               <Button
                 type="button"
                 variant="outline"
@@ -511,6 +579,7 @@ export default function AddCoursePage() {
           </form>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

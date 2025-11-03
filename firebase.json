@@ -2,8 +2,11 @@
   "firestore": {
     "rules": "firestore.rules"
   },
-  "storage": {
-    "rules": "storage.rules"
-  }
+  "storage": [
+    {
+      "bucket": "ohacks-ce5c0.firebasestorage.app",
+      "rules": "storage.rules"
+    }
+  ]
 }
 

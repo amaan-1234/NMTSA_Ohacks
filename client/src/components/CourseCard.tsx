@@ -38,12 +38,22 @@ export default function CourseCard({
   const { add, showToast } = useCart();
   const [, setLocation] = useLocation();
 
-  const enrollOrAdd = () => {
+  // Debug log to verify enrollment status
+  console.log(`🔧 CourseCard "${title}": isEnrolled=${isEnrolled}, progress=${progress}`);
+
+  const enrollOrAdd = async () => {
     if (!isAuthenticated) {
       setLocation(`/auth/login?redirect=${encodeURIComponent("/courses?greet=1")}`);
       return;
     }
-    // Add to cart for logged-in users
+
+    // For free courses, navigate directly to course page for instant enrollment
+    if (!isPremium || price === 0) {
+      setLocation(`/course/${id}`);
+      return;
+    }
+
+    // For paid courses, add to cart
     const courseTitle = title || "Course";
     const coursePrice = price ?? null;
     add({ id: String(id), title: courseTitle, price: coursePrice }, 1);
@@ -51,7 +61,7 @@ export default function CourseCard({
   };
 
   const onContinue = () => {
-    setLocation(`/courses/${id}`);
+    setLocation(`/course/${id}`);
   };
   return (
     <Card className="overflow-hidden hover-elevate transition-all duration-200 group" data-testid={`card-course-${title.toLowerCase().replace(/\s+/g, '-')}`}>
@@ -109,27 +119,50 @@ export default function CourseCard({
         )}
       </CardContent>
 
-      <CardFooter className="pt-0">
+      <CardFooter className="pt-0 flex-col gap-3">
         {isEnrolled ? (
           <Button className="w-full" onClick={onContinue} data-testid="button-continue-learning">
             Continue Learning
           </Button>
         ) : (
-          <div className="flex items-center justify-between w-full gap-3">
-            {price !== undefined && (
-              <span className="text-2xl font-bold text-primary" data-testid="text-course-price">
-                ${price}
-              </span>
+          <>
+            {price !== undefined && price > 0 && (
+              <div className="flex items-center justify-between w-full">
+                <span className="text-2xl font-bold text-primary" data-testid="text-course-price">
+                  ${price}
+                </span>
+              </div>
             )}
-            <Button
-              className={price !== undefined ? "flex-1" : "w-full"}
-              variant={price === undefined ? "default" : "default"}
-              onClick={enrollOrAdd}
-              data-testid="button-enroll"
-            >
-              {isAuthenticated ? "Add to Cart" : "Enroll Now"}
-            </Button>
-          </div>
+            {!isPremium || price === 0 ? (
+              // Free course - single "Enroll Free" button
+              <Button
+                className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white"
+                onClick={enrollOrAdd}
+                data-testid="button-enroll-free"
+              >
+                {isAuthenticated ? "Enroll Free" : "Sign In to Enroll"}
+              </Button>
+            ) : (
+              // Paid course - Learn More + Add to Cart buttons
+              <div className="flex items-center gap-2 w-full">
+                <Button
+                  variant="outline"
+                  onClick={onContinue}
+                  className="flex-1"
+                  data-testid="button-learn-more"
+                >
+                  Learn More
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={enrollOrAdd}
+                  data-testid="button-enroll"
+                >
+                  Add to Cart
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </CardFooter>
     </Card>

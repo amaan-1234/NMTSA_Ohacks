@@ -203,16 +203,25 @@ export default function ContentCategoryPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Add Category Form */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>{editId ? "Edit Category" : "Add Category"}</CardTitle>
-            <CardDescription>
-              {editId ? "Update the category details" : "Create a new course category"}
-            </CardDescription>
-          </CardHeader>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+        {/* Header */}
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold tracking-tight">Content Categories</h1>
+          <p className="text-muted-foreground">
+            Organize your courses by creating and managing categories
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Add Category Form */}
+          <Card className="lg:col-span-1 shadow-md">
+            <CardHeader className="bg-muted/30">
+              <CardTitle>{editId ? "Edit Category" : "Add Category"}</CardTitle>
+              <CardDescription>
+                {editId ? "Update the category details" : "Create a new course category"}
+              </CardDescription>
+            </CardHeader>
           <CardContent>
             <form onSubmit={handleAddCategory} className="space-y-4">
               <div className="space-y-2">
@@ -272,8 +281,8 @@ export default function ContentCategoryPage() {
         </Card>
 
         {/* Categories List */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
+        <Card className="lg:col-span-2 shadow-md">
+          <CardHeader className="bg-muted/30">
             <CardTitle>All Categories</CardTitle>
             <CardDescription>
               Manage course categories and view course counts
@@ -380,7 +389,7 @@ export default function ContentCategoryPage() {
             )}
           </CardContent>
         </Card>
-      </div>
+        </div>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
@@ -403,6 +412,7 @@ export default function ContentCategoryPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
     </div>
   );
 }

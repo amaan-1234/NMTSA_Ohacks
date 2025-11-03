@@ -13,6 +13,9 @@ import { useRoute, useLocation } from "wouter";
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
+import { hasAccessToCourse, updateCourseProgress, updateLastAccessed, enrollUserInCourse } from "@/lib/courseProgress";
+import { useToast } from "@/hooks/use-toast";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 type CourseMaterial = {
   name: string;
@@ -38,47 +41,301 @@ type CourseData = {
 export default function CourseDetail() {
   const [match, params] = useRoute("/course/:id");
   const courseId = params?.id!;
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user, authReady } = useAuth();
   const { add, showToast } = useCart();
   const [, setLocation] = useLocation();
   const [course, setCourse] = useState<CourseData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasAccess, setHasAccess] = useState(false);
+  const [userProgress, setUserProgress] = useState({
+    progress: 0,
+    lessonsCompleted: 0,
+    totalLessons: 12,
+  });
+  const [completedLessons, setCompletedLessons] = useState<Set<number>>(new Set());
+  const { toast } = useToast();
+  const [refreshKey, setRefreshKey] = useState(0);
+  const analytics = useAnalytics();
+  
+  // Debug log to verify component is loading
+  console.log("🔧 CourseDetail component loaded - Button text fixed");
 
-  // Fetch course data from Firestore
+  // Fetch course data and user progress
   useEffect(() => {
-    const fetchCourse = async () => {
+    const fetchData = async () => {
+      // Don't proceed until auth is ready
+      if (!authReady) {
+        console.log("⏳ Waiting for auth to be ready...");
+        return;
+      }
+
+      setLoading(true);
+      console.log("🔄 Fetching course data and enrollment status...");
+
       try {
+        // Fetch course data
         const courseDoc = await getDoc(doc(db, "courses", courseId));
-        if (courseDoc.exists()) {
-          setCourse({ id: courseDoc.id, ...courseDoc.data() } as CourseData);
+        if (!courseDoc.exists()) {
+          console.log("❌ Course not found");
+          setLoading(false);
+          return;
+        }
+
+        const courseData = { id: courseDoc.id, ...courseDoc.data() } as CourseData;
+        setCourse(courseData);
+        console.log("✅ Course data loaded:", courseData.title);
+
+        // Track course access
+        analytics.trackCourseAccess(courseId);
+
+        // Check if user has access and fetch progress
+        if (user?.id) {
+          console.log("👤 User authenticated, checking access...");
+          let access = await hasAccessToCourse(user.id, courseId);
+          console.log(`🔑 Access check result: ${access}`);
+
+          // Auto-enroll in free courses
+          if (!access && (!courseData.isPremium || courseData.price === 0)) {
+            console.log("🆓 Auto-enrolling user in free course...");
+            try {
+              await enrollUserInCourse(user.id, courseId, {
+                title: courseData.title,
+                instructor: courseData.instructor,
+                thumbnail: courseData.thumbnail,
+                duration: courseData.duration,
+                ceCredits: courseData.ceCredits || 0,
+                price: courseData.price || 0,
+                level: courseData.level,
+              });
+              
+              // Track enrollment
+              analytics.trackCourseEnrollment(courseId);
+              
+              // Wait for Firestore to propagate
+              await new Promise(resolve => setTimeout(resolve, 500));
+              
+              toast({
+                title: "Enrolled Successfully!",
+                description: `You've been enrolled in ${courseData.title}`,
+              });
+              
+              // Update access state immediately after enrollment
+              access = true;
+              setHasAccess(true);
+              console.log("✅ Auto-enrollment complete, access granted");
+            } catch (error) {
+              console.error("❌ Error enrolling in free course:", error);
+              toast({
+                title: "Enrollment Error",
+                description: "Failed to enroll in course. Please try again.",
+                variant: "destructive",
+              });
+            }
+          } else {
+            setHasAccess(access);
+          }
+
+          // Fetch user's progress if they have access
+          if (access) {
+            console.log("📊 Loading user progress...");
+            const userCourseDoc = await getDoc(doc(db, "user_courses", user.id, "courses", courseId));
+            if (userCourseDoc.exists()) {
+              const data = userCourseDoc.data();
+              setUserProgress({
+                progress: data.progress || 0,
+                lessonsCompleted: data.lessonsCompleted || 0,
+                totalLessons: data.totalLessons || 12,
+              });
+              console.log("📈 Progress loaded:", data.progress + "%");
+
+              // Initialize completed lessons set
+              const completed = new Set<number>();
+              for (let i = 1; i <= (data.lessonsCompleted || 0); i++) {
+                completed.add(i);
+              }
+              setCompletedLessons(completed);
+            } else {
+              console.log("📊 No progress data found yet");
+            }
+
+            // Update last accessed
+            await updateLastAccessed(user.id, courseId);
+          }
+        } else {
+          console.log("🔒 User not authenticated");
         }
       } catch (error) {
-        console.error("Error fetching course:", error);
+        console.error("❌ Error fetching course data:", error);
       } finally {
         setLoading(false);
       }
     };
     
-    if (courseId) {
-      fetchCourse();
+    if (courseId && authReady) {
+      fetchData();
     }
-  }, [courseId]);
+  }, [courseId, user?.id, authReady, toast, refreshKey]);
 
-  const enrollOrAdd = () => {
+  const enrollOrAdd = async () => {
     if (!isAuthenticated) return setLocation(`/auth/login?redirect=${encodeURIComponent("/courses?greet=1")}`);
-    if (!course) return;
-    // Add to cart for logged-in users
+    if (!course || !user?.id) return;
+    
+    // For free courses, enroll if not already enrolled
+    if (!course.isPremium || course.price === 0) {
+      if (hasAccess) {
+        toast({
+          title: "Already Enrolled!",
+          description: "You have access to this free course. Start learning!",
+        });
+        return;
+      }
+      
+      // Manual enrollment for free course
+      try {
+        setLoading(true);
+        console.log("🎓 Starting manual enrollment process...");
+        
+        await enrollUserInCourse(user.id, courseId, {
+          title: course.title,
+          instructor: course.instructor,
+          thumbnail: course.thumbnail,
+          duration: course.duration,
+          ceCredits: course.ceCredits || 0,
+          price: course.price || 0,
+          level: course.level,
+        });
+        
+        // Track enrollment
+        analytics.trackCourseEnrollment(courseId);
+        
+        console.log("✅ Enrollment complete, waiting for propagation...");
+        
+        // Wait a moment for Firestore to propagate
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        // Verify enrollment and fetch progress
+        const userCourseDoc = await getDoc(doc(db, "user_courses", user.id, "courses", courseId));
+        if (userCourseDoc.exists()) {
+          const data = userCourseDoc.data();
+          setUserProgress({
+            progress: data.progress || 0,
+            lessonsCompleted: data.lessonsCompleted || 0,
+            totalLessons: data.totalLessons || 12,
+          });
+          console.log("📊 Progress loaded:", data.progress + "%");
+          setHasAccess(true);
+        } else {
+          console.warn("⚠️ Enrollment document not found, triggering refresh...");
+          // Trigger a full refresh to re-check enrollment
+          setRefreshKey(prev => prev + 1);
+        }
+        
+        toast({
+          title: "Enrolled Successfully!",
+          description: "You can now access all course materials and lessons.",
+        });
+        
+        console.log("🎉 Enrollment complete! Access granted.");
+      } catch (error) {
+        console.error("❌ Error enrolling in course:", error);
+        toast({
+          title: "Enrollment Failed",
+          description: "Please try again or contact support.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+    
+    // Add to cart for paid courses
     add({ id: String(courseId), title: course.title, price: course.price || 0 }, 1);
     showToast("Item Added to Cart Successfully");
   };
 
   const lessons = [
-    { id: 1, title: "Introduction to NMT Principles", duration: "45 min", completed: true },
-    { id: 2, title: "Neurological Foundations", duration: "60 min", completed: true },
-    { id: 3, title: "Assessment Methods", duration: "50 min", completed: false },
-    { id: 4, title: "Treatment Planning", duration: "55 min", completed: false },
-    { id: 5, title: "Case Studies", duration: "70 min", completed: false },
+    { id: 1, title: "Introduction to NMT Principles", duration: "45 min" },
+    { id: 2, title: "Neurological Foundations", duration: "60 min" },
+    { id: 3, title: "Assessment Methods", duration: "50 min" },
+    { id: 4, title: "Treatment Planning", duration: "55 min" },
+    { id: 5, title: "Case Studies", duration: "70 min" },
+    { id: 6, title: "Clinical Applications", duration: "60 min" },
+    { id: 7, title: "Patient Assessment Techniques", duration: "50 min" },
+    { id: 8, title: "Treatment Documentation", duration: "40 min" },
+    { id: 9, title: "Evidence-Based Practice", duration: "55 min" },
+    { id: 10, title: "Working with Diverse Populations", duration: "50 min" },
+    { id: 11, title: "Advanced Case Studies", duration: "65 min" },
+    { id: 12, title: "Certification Preparation", duration: "60 min" },
   ];
+
+  const handleLessonClick = async (lessonId: number) => {
+    if (!hasAccess || !user?.id) {
+      toast({
+        title: "Enrollment Required",
+        description: "Please purchase this course to access lessons",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Toggle lesson completion
+    const newCompleted = new Set(completedLessons);
+    const wasCompleted = newCompleted.has(lessonId);
+    
+    if (wasCompleted) {
+      newCompleted.delete(lessonId);
+    } else {
+      newCompleted.add(lessonId);
+      // Track lesson completion
+      analytics.trackCourseProgress(courseId, Math.round((newCompleted.size / userProgress.totalLessons) * 100));
+    }
+    
+    setCompletedLessons(newCompleted);
+
+    // Update progress in Firestore
+    try {
+      await updateCourseProgress(
+        user.id,
+        courseId,
+        newCompleted.size,
+        userProgress.totalLessons
+      );
+
+      // Update local state
+      const newProgress = Math.round((newCompleted.size / userProgress.totalLessons) * 100);
+      setUserProgress({
+        ...userProgress,
+        progress: newProgress,
+        lessonsCompleted: newCompleted.size,
+      });
+
+      toast({
+        title: newCompleted.has(lessonId) ? "Lesson Completed!" : "Lesson Unmarked",
+        description: newCompleted.has(lessonId)
+          ? `Progress: ${newProgress}%`
+          : "Lesson marked as incomplete",
+      });
+
+      // If all lessons completed, show congratulations
+      if (newCompleted.size === userProgress.totalLessons) {
+        // Track course completion
+        analytics.trackCourseCompletion(courseId);
+        
+        toast({
+          title: "🎉 Course Completed!",
+          description: "Congratulations! You can now download your certificate from the dashboard.",
+        });
+      }
+    } catch (error) {
+      console.error("Error updating progress:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update progress. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   if (loading) {
     return (
@@ -134,13 +391,18 @@ export default function CourseDetail() {
                 <img src={courseImg} alt="Course preview" className="w-full h-full object-cover" />
               </div>
 
+              {hasAccess && (
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm text-muted-foreground">Your Progress</span>
-                  <span className="text-sm font-medium">40% Complete</span>
+                    <span className="text-sm font-medium">{userProgress.progress}% Complete</span>
+                  </div>
+                  <Progress value={userProgress.progress} className="h-2" />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {userProgress.lessonsCompleted} of {userProgress.totalLessons} lessons completed
+                  </p>
                 </div>
-                <Progress value={40} className="h-2" />
-              </div>
+              )}
             </div>
 
             <div className="lg:col-span-1">
@@ -163,10 +425,35 @@ export default function CourseDetail() {
                     Board-certified music therapist with 15+ years of experience 
                     in neurologic rehabilitation.
                   </p>
-                  <Button className="w-full" onClick={enrollOrAdd} data-testid="button-continue-course">
+                  {!hasAccess && (
+                    <Button 
+                      className={`w-full ${(!course?.isPremium || course?.price === 0) 
+                        ? 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800' 
+                        : ''}`}
+                      onClick={enrollOrAdd} 
+                      data-testid="button-continue-course"
+                    >
+                      <Play className="w-4 h-4 mr-2" />
+                      {!course?.isPremium || course?.price === 0 
+                        ? (isAuthenticated ? "Enroll Free" : "Sign In to Enroll")
+                        : (isAuthenticated ? "Add to Cart" : "Enroll Now")}
+                    </Button>
+                  )}
+                  {hasAccess && (
+                    <Button 
+                      className="w-full bg-green-600 hover:bg-green-700 text-white"
+                      onClick={() => {
+                        // Scroll to lessons section - Updated 2024
+                        const lessonsTab = document.querySelector('[value="lessons"]') as HTMLElement;
+                        lessonsTab?.click();
+                        window.scrollTo({ top: 500, behavior: 'smooth' });
+                      }}
+                      data-testid="button-start-learning"
+                    >
                     <Play className="w-4 h-4 mr-2" />
-                    {isAuthenticated ? "Add to Cart" : "Enroll Now"}
+                      Start Learning
                   </Button>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -186,25 +473,58 @@ export default function CourseDetail() {
           <TabsContent value="lessons">
             <Card>
               <CardContent className="p-6">
+                {!hasAccess && (
+                  <div className="text-center py-8 px-4 bg-muted/30 rounded-lg border-2 border-dashed mb-4">
+                    <p className="text-muted-foreground mb-3">
+                      {!course?.isPremium || course?.price === 0 
+                        ? (isAuthenticated ? "Click below to enroll in this free course" : "Sign in to access this free course")
+                        : "Purchase this course to access all lessons"}
+                    </p>
+                    <Button 
+                      onClick={enrollOrAdd} 
+                      size="sm"
+                      className={(!course?.isPremium || course?.price === 0) 
+                        ? 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800' 
+                        : ''}
+                    >
+                      {!course?.isPremium || course?.price === 0 
+                        ? (isAuthenticated ? "Enroll Free" : "Sign In to Enroll")
+                        : (isAuthenticated ? "Add to Cart" : "Enroll Now")}
+                    </Button>
+                  </div>
+                )}
                 <div className="space-y-2">
-                  {lessons.map((lesson, index) => (
+                  {lessons.map((lesson, index) => {
+                    const isCompleted = completedLessons.has(lesson.id);
+                    return (
                     <button
                       key={lesson.id}
-                      className="w-full flex items-center gap-4 p-4 rounded-md hover-elevate transition-all text-left"
+                        onClick={() => handleLessonClick(lesson.id)}
+                        disabled={!hasAccess}
+                        className={`w-full flex items-center gap-4 p-4 rounded-md transition-all text-left ${
+                          hasAccess
+                            ? 'hover:bg-muted/50 hover:shadow-md cursor-pointer'
+                            : 'opacity-50 cursor-not-allowed'
+                        }`}
                       data-testid={`button-lesson-${index + 1}`}
                     >
-                      {lesson.completed ? (
-                        <CheckCircle className="w-5 h-5 text-chart-3 flex-shrink-0" />
+                        {isCompleted ? (
+                          <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
                       ) : (
                         <Circle className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium">{lesson.title}</p>
+                          <p className={`font-medium ${isCompleted ? 'text-green-600' : ''}`}>
+                            {lesson.title}
+                          </p>
                         <p className="text-sm text-muted-foreground">{lesson.duration}</p>
                       </div>
+                        {hasAccess && (
                       <Play className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        )}
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>

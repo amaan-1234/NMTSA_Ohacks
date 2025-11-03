@@ -1,6 +1,7 @@
 import React from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { EmailInput } from "@/components/ui/EmailInput";
 import AuthShell from "@/components/auth/AuthShell";
 import GoogleButton from "@/components/auth/GoogleButton";
 import PasswordInput from "@/components/auth/PasswordInput";
@@ -43,13 +44,14 @@ const Divider = () => (
 );
 
 const LoginPage: React.FC = () => {
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const [, setLocation] = useLocation();
   const search = useSearch();
 
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [status, setStatus] = React.useState<"idle"|"loading"|"ok"|"fail">("idle");
+  const [isEmailValid, setIsEmailValid] = React.useState(true);
   const [msg, setMsg] = React.useState<string | null>(null);
 
   // Check if coming from signup
@@ -106,7 +108,13 @@ const LoginPage: React.FC = () => {
             
             <div className="space-y-1.5">
               <label className="text-sm">Email Address</label>
-              <Input value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <EmailInput
+                value={email}
+                onChange={setEmail}
+                showValidation={true}
+                onValidationChange={setIsEmailValid}
+                disabled={status === "loading"}
+              />
             </div>
 
             <div className="space-y-1.5">
@@ -123,22 +131,25 @@ const LoginPage: React.FC = () => {
               <p className={status === "ok" ? "text-green-600 text-sm" : "text-red-600 text-sm"}>{msg}</p>
             )}
 
-            <Button disabled={status==="loading"} type="submit" className="w-full mt-1">
+            <Button disabled={status==="loading" || !isEmailValid} type="submit" className="w-full mt-1">
               {status === "loading" ? "Continuing…" : "Continue"}
             </Button>
 
-            {/* keep your Divider + GoogleButton if you want a mock Google login */}
-            {/* remove GoogleButton or replace with Firebase oauth later */}
             <Divider />
             <GoogleButton
               type="button"
+              disabled={status === "loading"}
               onClick={async () => {
-                const res = await login({ email: "googleuser@example.com", username: "googleuser", password: "oauth" });
+                setStatus("loading");
+                setMsg(null);
+                const res = await loginWithGoogle();
                 if (res.ok) {
-                  setStatus("ok"); setMsg("Login successful!");
-                  // DO NOT navigate here. AuthProvider handles routing.
+                  setStatus("ok");
+                  setMsg("Login successful!");
+                  // AuthProvider handles routing
                 } else {
-                  setStatus("fail"); setMsg(res.message);
+                  setStatus("fail");
+                  setMsg(res.message);
                 }
               }}
             >
