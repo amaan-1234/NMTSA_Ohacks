@@ -5,7 +5,7 @@ const { initializeApp } = require("firebase/app");
 const { getFirestore, doc, setDoc } = require("firebase/firestore");
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDtCV_DteOu6UREKpUIFt-wgJSMxwwHuOI",
+  apiKey: "API_KEY",
   authDomain: "ohacks-ce5c0.firebaseapp.com",
   projectId: "ohacks-ce5c0",
   storageBucket: "ohacks-ce5c0.appspot.com",
