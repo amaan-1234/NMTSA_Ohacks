@@ -773,10 +773,11 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
     throw err;
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
+  // Skip vite and static serving in Vercel serverless mode
+  // Vercel handles static file serving automatically from dist/public
+  if (process.env.VERCEL || process.env.VERCEL_ENV) {
+    log("[server] Running in Vercel serverless mode - skipping vite/static setup and server.listen()");
+  } else if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
@@ -789,8 +790,6 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
     server.listen(port, () => {
       log(`serving on port ${port}`);
     });
-  } else {
-    log("[server] Running in Vercel serverless mode - skipping server.listen()");
   }
 })();
 
